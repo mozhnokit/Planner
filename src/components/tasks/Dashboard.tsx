@@ -146,12 +146,13 @@ export function Dashboard() {
     await createTeam(name, description);
   };
 
-  const handleInviteMember = async (email: string) => {
-    if (!currentTeam) return;
+  const handleInviteMember = async (email: string): Promise<{ error?: Error | null }> => {
+    if (!currentTeam) return { error: new Error('No team selected') };
     const result = await inviteMember(currentTeam.id, email);
     if (result.error) {
       alert(result.error.message);
     }
+    return result;
   };
 
   const handleRemoveMember = async (userId: string) => {
