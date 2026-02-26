@@ -79,6 +79,23 @@ const translations = {
     "inProgress": "In Progress",
     "review": "Review",
     "done": "Done",
+    
+    // Teams
+    "teamTasks": "Team Tasks",
+    "createTeam": "Create Team",
+    "teamName": "Team Name",
+    "teamDescription": "Description",
+    "inviteMember": "Invite Member",
+    "teamMembers": "Team Members",
+    "inviteByEmail": "Invite by email",
+    "createTeamDesc": "Create a new team to collaborate with others",
+    "creating": "Creating...",
+    "inviting": "Inviting...",
+    "invite": "Invite",
+    "member": "Member",
+    "owner": "Owner",
+    "admin": "Admin",
+    "manageTeamMembers": "Manage your team members",
   },
   ru: {
     // Header
@@ -154,6 +171,23 @@ const translations = {
     "inProgress": "В процессе",
     "review": "На проверке",
     "done": "Готово",
+    
+    // Teams
+    "teamTasks": "Командные задачи",
+    "createTeam": "Создать команду",
+    "teamName": "Название команды",
+    "teamDescription": "Описание",
+    "inviteMember": "Пригласить участника",
+    "teamMembers": "Участники команды",
+    "inviteByEmail": "Пригласить по email",
+    "createTeamDesc": "Создайте новую команду для совместной работы",
+    "creating": "Создание...",
+    "inviting": "Приглашение...",
+    "invite": "Пригласить",
+    "member": "Участник",
+    "owner": "Владелец",
+    "admin": "Администратор",
+    "manageTeamMembers": "Управление участниками команды",
   },
 };
 

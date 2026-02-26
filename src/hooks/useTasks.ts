@@ -9,6 +9,8 @@ interface UseTasksOptions {
   filter?: 'all' | 'my-tasks' | 'urgent';
   statusFilter?: TaskStatus[];
   priorityFilter?: Priority[];
+  scope?: 'personal' | 'team';
+  teamId?: string | null;
 }
 
 export function useTasks(options: UseTasksOptions = {}) {
@@ -18,16 +20,40 @@ export function useTasks(options: UseTasksOptions = {}) {
 
   const fetchTasks = useCallback(async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       let query = supabase
         .from('tasks')
-        .select('*')
+        .select(`
+          *,
+          assignee:profiles!tasks_assignee_id_fkey (
+            id,
+            email,
+            full_name,
+            avatar_url
+          ),
+          creator:profiles!tasks_created_by_fkey (
+            id,
+            email,
+            full_name,
+            avatar_url
+          )
+        `)
         .order('created_at', { ascending: false });
 
+      // Фильтрация по scope (личные/командные)
+      if (options.scope === 'personal') {
+        // Личные задачи: is_private = true ИЛИ (team_id IS NULL AND created_by = user.id)
+        query = query.or(`is_private.eq.true,team_id.is.null,and(created_by.eq.${user.id},team_id.is.null)`);
+      } else if (options.scope === 'team' && options.teamId) {
+        // Командные задачи
+        query = query.eq('team_id', options.teamId).eq('is_private', false);
+      }
+
+      // Дополнительные фильтры
       if (options.filter === 'my-tasks') {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          query = query.eq('assignee_id', user.id);
-        }
+        query = query.eq('assignee_id', user.id);
       } else if (options.filter === 'urgent') {
         query = query.eq('priority', 'urgent');
       }
@@ -50,7 +76,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [options.filter, options.statusFilter, options.priorityFilter]);
+  }, [options.filter, options.statusFilter, options.priorityFilter, options.scope, options.teamId]);
 
   useEffect(() => {
     fetchTasks();
@@ -107,6 +133,8 @@ export function useTasks(options: UseTasksOptions = {}) {
         .insert({
           ...task,
           created_by: user.id,
+          is_private: task.is_private ?? false,
+          team_id: task.team_id ?? null,
         })
         .select()
         .single();

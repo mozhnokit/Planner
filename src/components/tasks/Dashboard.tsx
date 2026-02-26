@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTasks } from "@/hooks/useTasks";
+import { useTeams } from "@/hooks/useTeams";
 import { usePresence } from "@/hooks/usePresence";
 import { useLocale } from "@/context/LocaleContext";
 import { TaskModal } from "./TaskModal";
@@ -10,6 +11,9 @@ import { TaskCard } from "./TaskCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { TeamSwitcher } from "@/components/teams/TeamSwitcher";
+import { CreateTeamModal } from "@/components/teams/CreateTeamModal";
+import { TeamMembersModal } from "@/components/teams/TeamMembersModal";
 import {
   Select,
   SelectContent,
@@ -20,7 +24,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, Filter, Users, Zap, LogOut, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Task, Priority, TaskStatus } from "@/types";
+import { Task, Priority, TaskStatus, Team, TeamMember } from "@/types";
 import { priorityConfig, getInitials } from "@/lib/utils";
 import {
   DndContext,
@@ -36,14 +40,33 @@ export function Dashboard() {
   const { user, signOut, updatePresence } = useAuth();
   const { onlineUsers } = usePresence();
   const { t } = useLocale();
+  const {
+    teams,
+    currentTeam,
+    setCurrentTeam,
+    members,
+    createTeam,
+    inviteMember,
+    removeMember,
+  } = useTeams();
+  
   const [filter, setFilter] = useState<'all' | 'my-tasks' | 'urgent'>('all');
   const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  
+  // Team state
+  const [taskScope, setTaskScope] = useState<'personal' | 'team'>('personal');
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
+  const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 
-  const { tasks, loading, createTask, updateTask, deleteTask } = useTasks({ filter });
+  const { tasks, loading, createTask, updateTask, deleteTask } = useTasks({ 
+    filter,
+    scope: taskScope,
+    teamId: taskScope === 'team' ? currentTeam?.id : null,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -106,6 +129,8 @@ export function Dashboard() {
         status: taskData.status || 'todo',
         deadline: taskData.deadline || null,
         assignee_id: taskData.assignee_id || null,
+        team_id: taskScope === 'team' ? currentTeam?.id || null : null,
+        is_private: taskScope === 'personal',
       } as Omit<Task, 'id' | 'created_at' | 'updated_at'>);
     }
   };
@@ -115,6 +140,23 @@ export function Dashboard() {
       await deleteTask(selectedTask.id);
       setIsModalOpen(false);
     }
+  };
+
+  const handleCreateTeam = async (name: string, description: string) => {
+    await createTeam(name, description);
+  };
+
+  const handleInviteMember = async (email: string) => {
+    if (!currentTeam) return;
+    const result = await inviteMember(currentTeam.id, email);
+    if (result.error) {
+      alert(result.error.message);
+    }
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!currentTeam) return;
+    await removeMember(currentTeam.id, userId);
   };
 
   // Получаем список пользователей для назначения
@@ -149,6 +191,17 @@ export function Dashboard() {
               <div className="flex items-center gap-4">
                 {/* Language Switcher */}
                 <LanguageSwitcher />
+
+                {/* Team Switcher */}
+                <TeamSwitcher
+                  teams={teams as unknown as Team[]}
+                  currentTeam={currentTeam as unknown as Team | null}
+                  onTeamChange={(id) => setCurrentTeam(teams.find(t => t.id === id) as unknown as Team | null)}
+                  onScopeChange={setTaskScope}
+                  currentScope={taskScope}
+                  onCreateTeam={() => setIsCreateTeamModalOpen(true)}
+                  onManageMembers={() => setIsMembersModalOpen(true)}
+                />
 
                 {/* Online Users */}
                 <div className="flex items-center gap-2">
@@ -292,6 +345,24 @@ export function Dashboard() {
           onDelete={handleDeleteTask}
           users={users}
           t={t}
+        />
+
+        {/* Create Team Modal */}
+        <CreateTeamModal
+          open={isCreateTeamModalOpen}
+          onOpenChange={setIsCreateTeamModalOpen}
+          onCreate={handleCreateTeam}
+        />
+
+        {/* Team Members Modal */}
+        <TeamMembersModal
+          team={currentTeam as unknown as Team | null}
+          members={members as unknown as TeamMember[]}
+          open={isMembersModalOpen}
+          onOpenChange={setIsMembersModalOpen}
+          onInvite={handleInviteMember}
+          onRemove={handleRemoveMember}
+          isOwner={currentTeam?.owner_id === user?.id}
         />
       </div>
     </DndContext>

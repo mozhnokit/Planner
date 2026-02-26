@@ -48,11 +48,40 @@ CREATE TABLE IF NOT EXISTS presence (
   last_seen TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
+-- Создаем таблицу команд
+CREATE TABLE IF NOT EXISTS teams (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  owner_id UUID REFERENCES profiles(id) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Создаем таблицу участников команд
+CREATE TABLE IF NOT EXISTS team_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  team_id UUID REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES profiles(id) NOT NULL,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+  joined_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  UNIQUE(team_id, user_id)
+);
+
+-- Добавляем поле is_private и team_id в tasks
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT false;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES teams(id) ON DELETE SET NULL;
+
 -- Индексы для производительности
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_deadline ON tasks(deadline);
+CREATE INDEX IF NOT EXISTS idx_tasks_team_id ON tasks(team_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_is_private ON tasks(is_private);
+CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members(team_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user_id ON team_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_teams_owner_id ON teams(owner_id);
 CREATE INDEX IF NOT EXISTS idx_comments_task_id ON comments(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id);
 
@@ -148,6 +177,121 @@ CREATE POLICY "Users can update their own presence"
   ON presence FOR UPDATE
   TO authenticated
   USING (auth.uid() = user_id);
+
+-- RLS политики для teams
+ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Teams are viewable by members" ON teams;
+CREATE POLICY "Teams are viewable by members"
+  ON teams FOR SELECT
+  TO authenticated
+  USING (
+    id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    )
+    OR owner_id = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Authenticated users can create teams" ON teams;
+CREATE POLICY "Authenticated users can create teams"
+  ON teams FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = owner_id);
+
+DROP POLICY IF EXISTS "Team owners can update their teams" ON teams;
+CREATE POLICY "Team owners can update their teams"
+  ON teams FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = owner_id);
+
+DROP POLICY IF EXISTS "Team owners can delete their teams" ON teams;
+CREATE POLICY "Team owners can delete their teams"
+  ON teams FOR DELETE
+  TO authenticated
+  USING (auth.uid() = owner_id);
+
+-- RLS политики для team_members
+ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Team members are viewable by members" ON team_members;
+CREATE POLICY "Team members are viewable by members"
+  ON team_members FOR SELECT
+  TO authenticated
+  USING (
+    team_id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Team owners can manage members" ON team_members;
+CREATE POLICY "Team owners can manage members"
+  ON team_members FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    team_id IN (
+      SELECT id FROM teams WHERE owner_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Team owners can remove members" ON team_members;
+CREATE POLICY "Team owners can remove members"
+  ON team_members FOR DELETE
+  TO authenticated
+  USING (
+    team_id IN (
+      SELECT id FROM teams WHERE owner_id = auth.uid()
+    )
+  );
+
+-- RLS политики для tasks (обновленные)
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Tasks are viewable by authorized users" ON tasks;
+CREATE POLICY "Tasks are viewable by authorized users"
+  ON tasks FOR SELECT
+  TO authenticated
+  USING (
+    -- Личные задачи
+    (is_private = true AND created_by = auth.uid())
+    OR
+    -- Командные задачи
+    (is_private = false AND team_id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    ))
+    OR
+    -- Задачи созданные пользователем
+    created_by = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Authenticated users can create tasks" ON tasks;
+CREATE POLICY "Authenticated users can create tasks"
+  ON tasks FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = created_by);
+
+DROP POLICY IF EXISTS "Authorized users can update tasks" ON tasks;
+CREATE POLICY "Authorized users can update tasks"
+  ON tasks FOR UPDATE
+  TO authenticated
+  USING (
+    created_by = auth.uid()
+    OR
+    team_id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Authorized users can delete tasks" ON tasks;
+CREATE POLICY "Authorized users can delete tasks"
+  ON tasks FOR DELETE
+  TO authenticated
+  USING (
+    created_by = auth.uid()
+    OR
+    team_id IN (
+      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    )
+  );
 
 -- Функция для автоматического создания профиля при регистрации
 CREATE OR REPLACE FUNCTION public.handle_new_user()
