@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTasks } from "@/hooks/useTasks";
 import { useTeams } from "@/hooks/useTeams";
@@ -29,7 +29,6 @@ import { priorityConfig, getInitials } from "@/lib/utils";
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   DragOverlay,
   useSensor,
   useSensors,
@@ -49,20 +48,20 @@ export function Dashboard() {
     inviteMember,
     removeMember,
   } = useTeams();
-  
+
   const [filter, setFilter] = useState<'all' | 'my-tasks' | 'urgent'>('all');
   const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  
+
   // Team state
   const [taskScope, setTaskScope] = useState<'personal' | 'team'>('personal');
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 
-  const { tasks, loading, createTask, updateTask, deleteTask } = useTasks({ 
+  const { tasks, loading, createTask, updateTask, deleteTask, refetch } = useTasks({
     filter,
     scope: taskScope,
     teamId: taskScope === 'team' ? currentTeam?.id : null,
@@ -78,25 +77,20 @@ export function Dashboard() {
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
-    
     if (!over || !activeTask) return;
 
-    // Обработка изменения статуса при перетаскивании
     const overId = over.id as string;
     const newStatus = overId as TaskStatus;
-    
+
     if (newStatus && newStatus !== activeTask.status) {
       await updateTask(activeTask.id, { status: newStatus });
     }
-
     setActiveTask(null);
   }, [activeTask, updateTask]);
 
   const handleDragStart = useCallback((event: any) => {
     const task = event.active?.data?.current?.task;
-    if (task) {
-      setActiveTask(task);
-    }
+    if (task) setActiveTask(task);
   }, []);
 
   const filteredTasks = tasks.filter(task => {
@@ -120,18 +114,34 @@ export function Dashboard() {
   };
 
   const handleSaveTask = async (taskData: Partial<Task>) => {
-    if (selectedTask) {
-      await updateTask(selectedTask.id, taskData);
-    } else {
-      await createTask({
-        ...taskData,
-        priority: taskData.priority || 'medium',
-        status: taskData.status || 'todo',
-        deadline: taskData.deadline || null,
-        assignee_id: taskData.assignee_id || null,
-        team_id: taskScope === 'team' ? currentTeam?.id || null : null,
-        is_private: taskScope === 'personal',
-      } as Omit<Task, 'id' | 'created_at' | 'updated_at'>);
+    try {
+      if (selectedTask) {
+        await updateTask(selectedTask.id, taskData);
+      } else {
+        const newTask = {
+          ...taskData,
+          title: taskData.title?.trim() || 'Untitled',
+          description: taskData.description?.trim() || '',
+          priority: taskData.priority || 'medium',
+          status: taskData.status || 'todo',
+          deadline: taskData.deadline || null,
+          assignee_id: taskData.assignee_id || null,
+          team_id: taskScope === 'team' ? currentTeam?.id || null : null,
+          is_private: taskScope === 'personal',
+        } as Omit<Task, 'id' | 'created_at' | 'updated_at'>;
+        
+        const result = await createTask(newTask);
+        if (result.error) {
+          console.error('Error creating task:', result.error);
+          alert('Failed to create task: ' + result.error.message);
+        } else {
+          await refetch();
+        }
+      }
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error saving task:', error);
+      alert('Error saving task');
     }
   };
 
@@ -160,36 +170,49 @@ export function Dashboard() {
     await removeMember(currentTeam.id, userId);
   };
 
-  // Получаем список пользователей для назначения
+  // Load users for assignment
   const [users, setUsers] = useState<Array<{ id: string; email: string; full_name?: string }>>([]);
-  
-  useState(() => {
+
+  useEffect(() => {
     const fetchUsers = async () => {
-      // В реальном приложении здесь был бы запрос к API
-      // Для сейчас используем онлайн пользователей
+      // Load team members for assignment
+      if (members.length > 0) {
+        setUsers(members.map(m => ({
+          id: m.user_id,
+          email: m.user?.email || '',
+          full_name: m.user?.full_name || undefined,
+        })));
+      }
     };
     fetchUsers();
-  });
+  }, [members]);
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
         {/* Header */}
-        <header className="sticky top-0 z-50 glass border-b">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Zap className="h-8 w-8 text-primary" />
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+        <header className="sticky top-0 z-50 glass border-b shadow-lg">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              {/* Logo */}
+              <motion.div 
+                className="flex items-center gap-3"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+              >
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                >
+                  <Zap className="h-8 w-8 text-primary animate-pulse-glow" />
+                </motion.div>
+                <h1 className="text-xl md:text-2xl font-bold gradient-text">
                   {t("teamFlow")}
                 </h1>
-              </div>
+              </motion.div>
 
-              <div className="flex items-center gap-4">
+              {/* Controls */}
+              <div className="flex items-center gap-2 md:gap-4 flex-wrap">
                 {/* Language Switcher */}
                 <LanguageSwitcher />
 
@@ -205,30 +228,39 @@ export function Dashboard() {
                 />
 
                 {/* Online Users */}
-                <div className="flex items-center gap-2">
+                <motion.div 
+                  className="hidden lg:flex items-center gap-2"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <div className="flex -space-x-2">
-                    {onlineUsers.slice(0, 5).map((presence) => (
-                      <Avatar key={presence.user_id} className="h-8 w-8 border-2 border-background">
+                    {onlineUsers.slice(0, 4).map((presence) => (
+                      <Avatar key={presence.user_id} className="h-7 w-7 border-2 border-background">
                         <AvatarFallback className="text-xs bg-primary/20">
                           {getInitials(presence.user?.full_name, presence.user?.email)}
                         </AvatarFallback>
                       </Avatar>
                     ))}
                   </div>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {onlineUsers.length} {t("online")}
                   </span>
-                </div>
+                </motion.div>
 
                 {/* User Menu */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="text-xs bg-primary/20">
                       {getInitials(user?.user_metadata?.full_name, user?.email)}
                     </AvatarFallback>
                   </Avatar>
-                  <Button variant="ghost" size="sm" onClick={() => { signOut(); updatePresence(); }}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => { signOut(); updatePresence(); }}
+                    className="hidden sm:flex"
+                  >
                     <LogOut className="h-4 w-4 mr-2" />
                     {t("signOut")}
                   </Button>
@@ -244,21 +276,22 @@ export function Dashboard() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
             className="mb-6 space-y-4"
           >
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={t("searchTasks")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 glass"
+                  className="pl-10 glass hover-lift"
                 />
               </div>
 
               <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
-                <SelectTrigger className="w-[180px] glass">
+                <SelectTrigger className="w-[160px] glass hover-lift">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue />
                 </SelectTrigger>
@@ -269,41 +302,37 @@ export function Dashboard() {
                 </SelectContent>
               </Select>
 
-              <Button onClick={handleCreateTask} className="bg-gradient-to-r from-primary to-purple-500">
+              <Button 
+                onClick={handleCreateTask} 
+                className="bg-gradient-to-r from-primary to-purple-500 hover-lift animate-pulse-glow"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 {t("newTask")}
               </Button>
             </div>
-
-            {/* Status Filter Pills */}
-            <div className="flex gap-2 flex-wrap">
-              {Object.entries(priorityConfig).map(([key, config]) => (
-                <Button
-                  key={key}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    // Можно добавить фильтрацию по приоритету
-                  }}
-                  className={`${config.bgColor} ${config.color} hover:${config.bgColor}`}
-                >
-                  {config.label}
-                </Button>
-              ))}
-            </div>
           </motion.div>
 
           {/* Task Board */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+          >
             {(Object.keys(priorityConfig) as Priority[]).map((priority) => (
-              <div key={priority} className="space-y-3">
+              <motion.div 
+                key={priority} 
+                className="space-y-3"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
                 <div className={`flex items-center gap-2 pb-2 border-b ${priorityConfig[priority].color}`}>
                   <h2 className="font-semibold">{priorityConfig[priority].label}</h2>
                   <span className="text-xs text-muted-foreground">
                     {filteredTasks.filter(t => t.priority === priority).length}
                   </span>
                 </div>
-                
+
                 <div className="space-y-2 min-h-[200px]">
                   <AnimatePresence>
                     {filteredTasks
@@ -317,27 +346,35 @@ export function Dashboard() {
                       ))}
                   </AnimatePresence>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {loading && (
             <div className="flex items-center justify-center py-12">
-              <p className="text-muted-foreground">Loading tasks...</p>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+              />
             </div>
           )}
 
           {!loading && filteredTasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <p>{t("noTasksFound")}</p>
+            <motion.div 
+              className="flex flex-col items-center justify-center py-12 text-muted-foreground"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <p className="mb-4">{t("noTasksFound")}</p>
               <Button variant="link" onClick={handleCreateTask}>
                 {t("createFirstTask")}
               </Button>
-            </div>
+            </motion.div>
           )}
         </main>
 
-        {/* Task Modal */}
+        {/* Modals */}
         <TaskModal
           task={selectedTask}
           open={isModalOpen}
@@ -348,14 +385,12 @@ export function Dashboard() {
           t={t}
         />
 
-        {/* Create Team Modal */}
         <CreateTeamModal
           open={isCreateTeamModalOpen}
           onOpenChange={setIsCreateTeamModalOpen}
           onCreate={handleCreateTeam}
         />
 
-        {/* Team Members Modal */}
         <TeamMembersModal
           team={currentTeam as unknown as Team | null}
           members={members as unknown as TeamMember[]}
