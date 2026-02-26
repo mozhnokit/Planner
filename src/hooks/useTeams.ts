@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Team, TeamMember, User } from '@/types';
+import type { Team, TeamMember, User, TeamRole } from '@/types';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 export function useTeams() {
