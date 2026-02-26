@@ -194,7 +194,7 @@ const translations = {
 interface LocaleContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (key: keyof typeof translations.en) => string;
+  t: (key: string) => string;
 }
 
 const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
