@@ -214,8 +214,8 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("locale", newLocale);
   };
 
-  const t = (key: keyof typeof translations.en) => {
-    return translations[locale][key] || translations.en[key] || key;
+  const t = (key: string): string => {
+    return translations[locale][key as keyof typeof translations.en] || translations.en[key as keyof typeof translations.en] || key;
   };
 
   return (
