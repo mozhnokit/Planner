@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Team Flow Planner v1.0 */
+
 @layer base {
   :root {
     --background: 224 71% 4%;
