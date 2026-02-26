@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,9 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{task ? "Edit Task" : "Create Task"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {task ? "Edit task details and comments" : "Create a new task"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -139,12 +143,12 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Assignee</label>
-              <Select value={assignee} onValueChange={setAssignee}>
+              <Select value={assignee || "unassigned"} onValueChange={(v) => setAssignee(v === "unassigned" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select assignee" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
                   {users?.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.full_name || u.email}
