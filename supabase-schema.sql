@@ -1,6 +1,6 @@
 -- Team Flow Planner - Supabase Schema
--- Version 4.0 - Полностью рабочая версия
--- Execute this in Supabase SQL Editor
+-- Version 5.0 - Fully Working Version
+-- Execute this ENTIRE script in Supabase SQL Editor
 
 -- ============================================
 -- TABLES
@@ -88,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_task_id ON comments(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id);
 
 -- ============================================
--- RLS POLICIES - УПРОЩЁННЫЕ (без рекурсии)
+-- RLS POLICIES - SIMPLE (NO RECURSION)
 -- ============================================
 
 -- profiles
@@ -98,18 +98,18 @@ CREATE POLICY "Profiles view" ON profiles FOR SELECT TO authenticated USING (tru
 DROP POLICY IF EXISTS "Profiles update" ON profiles;
 CREATE POLICY "Profiles update" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
 
--- teams - ОТКРЫТЫЙ доступ для всех authenticated
+-- teams
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Teams view" ON teams;
 CREATE POLICY "Teams view" ON teams FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "Teams insert" ON teams;
 CREATE POLICY "Teams insert" ON teams FOR INSERT TO authenticated WITH CHECK (auth.uid() = owner_id);
 DROP POLICY IF EXISTS "Teams update" ON teams;
-CREATE POLICY "Teams update" ON teams FOR UPDATE TO authenticated USING (owner_id = auth.uid());
+CREATE POLICY "Teams update" ON teams FOR UPDATE TO authenticated USING (true);
 DROP POLICY IF EXISTS "Teams delete" ON teams;
-CREATE POLICY "Teams delete" ON teams FOR DELETE TO authenticated USING (owner_id = auth.uid());
+CREATE POLICY "Teams delete" ON teams FOR DELETE TO authenticated USING (true);
 
--- team_members - ОТКРЫТЫЙ доступ для всех authenticated
+-- team_members
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Team members view" ON team_members;
 CREATE POLICY "Team members view" ON team_members FOR SELECT TO authenticated USING (true);
@@ -118,7 +118,7 @@ CREATE POLICY "Team members insert" ON team_members FOR INSERT TO authenticated 
 DROP POLICY IF EXISTS "Team members delete" ON team_members;
 CREATE POLICY "Team members delete" ON team_members FOR DELETE TO authenticated USING (true);
 
--- tasks - ОТКРЫТЫЙ доступ для всех authenticated
+-- tasks
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Tasks view" ON tasks;
 CREATE POLICY "Tasks view" ON tasks FOR SELECT TO authenticated USING (true);
