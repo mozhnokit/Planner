@@ -23,31 +23,16 @@ export function useTasks(options: UseTasksOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Простой запрос без сложных JOIN
       let query = supabase
         .from('tasks')
-        .select(`
-          *,
-          assignee:profiles!tasks_assignee_id_fkey (
-            id,
-            email,
-            full_name,
-            avatar_url
-          ),
-          creator:profiles!tasks_created_by_fkey (
-            id,
-            email,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       // Фильтрация по scope (личные/командные)
       if (options.scope === 'personal') {
-        // Личные задачи: is_private = true ИЛИ (team_id IS NULL AND created_by = user.id)
-        query = query.or(`is_private.eq.true,team_id.is.null,and(created_by.eq.${user.id},team_id.is.null)`);
+        query = query.or(`is_private.eq.true,and(created_by.eq.${user.id},team_id.is.null)`);
       } else if (options.scope === 'team' && options.teamId) {
-        // Командные задачи
         query = query.eq('team_id', options.teamId).eq('is_private', false);
       }
 
@@ -69,7 +54,40 @@ export function useTasks(options: UseTasksOptions = {}) {
       const { data, error } = await query;
 
       if (error) throw error;
-      setTasks(data || []);
+
+      // Загружаем профили отдельно
+      const tasksWithProfiles = await Promise.all(
+        (data || []).map(async (task) => {
+          let assignee = null;
+          let creator = null;
+
+          if (task.assignee_id) {
+            const { data: assigneeData } = await supabase
+              .from('profiles')
+              .select('id, email, full_name, avatar_url')
+              .eq('id', task.assignee_id)
+              .single();
+            assignee = assigneeData;
+          }
+
+          if (task.created_by) {
+            const { data: creatorData } = await supabase
+              .from('profiles')
+              .select('id, email, full_name, avatar_url')
+              .eq('id', task.created_by)
+              .single();
+            creator = creatorData;
+          }
+
+          return {
+            ...task,
+            assignee,
+            creator,
+          };
+        })
+      );
+
+      setTasks(tasksWithProfiles as unknown as Task[]);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');

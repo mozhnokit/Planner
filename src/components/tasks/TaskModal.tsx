@@ -48,7 +48,7 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users, t
   const [assignee, setAssignee] = useState(task?.assignee_id || "");
   const [commentText, setCommentText] = useState("");
 
-  const { comments, addComment, deleteComment } = useComments(task?.id || "");
+  const { comments, addComment, deleteComment } = useComments(task?.id);
 
   const handleSave = () => {
     onSave({

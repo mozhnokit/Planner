@@ -16,33 +16,31 @@ export function useTeams() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Получаем команды, где пользователь является участником
-      const { data: memberTeams, error } = await supabase
+      // Сначала получаем team_members
+      const { data: memberData, error: memberError } = await supabase
         .from('team_members')
-        .select(`
-          team:teams (
-            id,
-            name,
-            description,
-            owner_id,
-            created_at,
-            updated_at,
-            owner:profiles!teams_owner_id_fkey (
-              id,
-              email,
-              full_name,
-              avatar_url
-            )
-          )
-        `)
+        .select('team_id')
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (memberError) throw memberError;
 
-      const teamsList = memberTeams?.map(m => m.team) || [];
+      if (!memberData || memberData.length === 0) {
+        setTeams([]);
+        return;
+      }
+
+      // Затем получаем команды
+      const teamIds = memberData.map(m => m.team_id);
+      const { data: teamsData, error: teamsError } = await supabase
+        .from('teams')
+        .select('*')
+        .in('id', teamIds);
+
+      if (teamsError) throw teamsError;
+
+      const teamsList = teamsData || [];
       setTeams(teamsList as unknown as Team[]);
 
-      // Устанавливаем текущую команду (первую в списке)
       if (teamsList.length > 0 && !currentTeam) {
         setCurrentTeam(teamsList[0] as unknown as Team);
       }
@@ -55,25 +53,35 @@ export function useTeams() {
 
   const fetchMembers = useCallback(async (teamId: string) => {
     try {
-      const { data, error } = await supabase
+      // Сначала получаем team_members
+      const { data: memberData, error: memberError } = await supabase
         .from('team_members')
-        .select(`
-          id,
-          team_id,
-          user_id,
-          role,
-          joined_at,
-          user:profiles!team_members_user_id_fkey (
-            id,
-            email,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('team_id', teamId);
 
-      if (error) throw error;
-      setMembers(data as unknown as TeamMember[]);
+      if (memberError) throw memberError;
+
+      if (!memberData || memberData.length === 0) {
+        setMembers([]);
+        return;
+      }
+
+      // Затем получаем профили пользователей
+      const userIds = memberData.map(m => m.user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Объединяем данные
+      const membersWithProfiles = memberData.map(m => ({
+        ...m,
+        user: profilesData?.find(p => p.id === m.user_id) || undefined,
+      }));
+
+      setMembers(membersWithProfiles as unknown as TeamMember[]);
     } catch (error) {
       console.error('Error fetching members:', error);
     }

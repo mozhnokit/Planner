@@ -5,28 +5,46 @@ import { supabase } from '@/lib/supabase';
 import type { Comment } from '@/types';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
-export function useComments(taskId: string) {
+export function useComments(taskId: string | undefined) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchComments = useCallback(async () => {
+    if (!taskId) {
+      setComments([]);
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Простой запрос без JOIN
       const { data, error } = await supabase
         .from('comments')
-        .select(`
-          *,
-          user:profiles!comments_user_id_fkey (
-            id,
-            email,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('task_id', taskId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setComments(data || []);
+
+      if (!data || data.length === 0) {
+        setComments([]);
+        setLoading(false);
+        return;
+      }
+
+      // Загружаем профили пользователей отдельно
+      const userIds = [...new Set(data.map(c => c.user_id))];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, avatar_url')
+        .in('id', userIds);
+
+      const commentsWithUsers = data.map(c => ({
+        ...c,
+        user: profilesData?.find(p => p.id === c.user_id) || undefined,
+      }));
+
+      setComments(commentsWithUsers as unknown as Comment[]);
     } catch (error) {
       console.error('Error fetching comments:', error);
     } finally {
