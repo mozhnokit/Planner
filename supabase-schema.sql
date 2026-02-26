@@ -1,12 +1,24 @@
 -- Team Flow Planner - Supabase Schema
--- Version 5.0 - Fully Working Version
+-- Version 6.0 - Clean Slate (Drop & Recreate)
 -- Execute this ENTIRE script in Supabase SQL Editor
 
 -- ============================================
--- TABLES
+-- DROP OLD TABLES
 -- ============================================
 
-CREATE TABLE IF NOT EXISTS profiles (
+DROP TABLE IF EXISTS task_history CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
+DROP TABLE IF EXISTS presence CASCADE;
+DROP TABLE IF EXISTS tasks CASCADE;
+DROP TABLE IF EXISTS team_members CASCADE;
+DROP TABLE IF EXISTS teams CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
+
+-- ============================================
+-- CREATE NEW TABLES
+-- ============================================
+
+CREATE TABLE profiles (
   id UUID REFERENCES auth.users(id) PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   full_name TEXT,
@@ -15,7 +27,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
-CREATE TABLE IF NOT EXISTS teams (
+CREATE TABLE teams (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT DEFAULT '',
@@ -24,7 +36,7 @@ CREATE TABLE IF NOT EXISTS teams (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
-CREATE TABLE IF NOT EXISTS team_members (
+CREATE TABLE team_members (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES profiles(id) NOT NULL,
@@ -33,7 +45,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   UNIQUE(team_id, user_id)
 );
 
-CREATE TABLE IF NOT EXISTS tasks (
+CREATE TABLE tasks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT DEFAULT '',
@@ -48,7 +60,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
-CREATE TABLE IF NOT EXISTS comments (
+CREATE TABLE comments (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   task_id UUID REFERENCES tasks(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES profiles(id) NOT NULL,
@@ -56,7 +68,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
-CREATE TABLE IF NOT EXISTS task_history (
+CREATE TABLE task_history (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   task_id UUID REFERENCES tasks(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES profiles(id) NOT NULL,
@@ -66,7 +78,7 @@ CREATE TABLE IF NOT EXISTS task_history (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
-CREATE TABLE IF NOT EXISTS presence (
+CREATE TABLE presence (
   user_id UUID REFERENCES profiles(id) PRIMARY KEY,
   last_seen TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
@@ -75,83 +87,62 @@ CREATE TABLE IF NOT EXISTS presence (
 -- INDEXES
 -- ============================================
 
-CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
-CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_deadline ON tasks(deadline);
-CREATE INDEX IF NOT EXISTS idx_tasks_team_id ON tasks(team_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_is_private ON tasks(is_private);
-CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members(team_id);
-CREATE INDEX IF NOT EXISTS idx_team_members_user_id ON team_members(user_id);
-CREATE INDEX IF NOT EXISTS idx_teams_owner_id ON teams(owner_id);
-CREATE INDEX IF NOT EXISTS idx_comments_task_id ON comments(task_id);
-CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+CREATE INDEX idx_tasks_priority ON tasks(priority);
+CREATE INDEX idx_tasks_assignee ON tasks(assignee_id);
+CREATE INDEX idx_tasks_deadline ON tasks(deadline);
+CREATE INDEX idx_tasks_team_id ON tasks(team_id);
+CREATE INDEX idx_tasks_is_private ON tasks(is_private);
+CREATE INDEX idx_team_members_team_id ON team_members(team_id);
+CREATE INDEX idx_team_members_user_id ON team_members(user_id);
+CREATE INDEX idx_teams_owner_id ON teams(owner_id);
+CREATE INDEX idx_comments_task_id ON comments(task_id);
+CREATE INDEX idx_task_history_task_id ON task_history(task_id);
 
 -- ============================================
--- RLS POLICIES - SIMPLE (NO RECURSION)
+-- RLS POLICIES - SIMPLE, NO RECURSION
 -- ============================================
 
 -- profiles
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Profiles view" ON profiles;
 CREATE POLICY "Profiles view" ON profiles FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Profiles update" ON profiles;
 CREATE POLICY "Profiles update" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
 
 -- teams
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Teams view" ON teams;
 CREATE POLICY "Teams view" ON teams FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Teams insert" ON teams;
 CREATE POLICY "Teams insert" ON teams FOR INSERT TO authenticated WITH CHECK (auth.uid() = owner_id);
-DROP POLICY IF EXISTS "Teams update" ON teams;
 CREATE POLICY "Teams update" ON teams FOR UPDATE TO authenticated USING (true);
-DROP POLICY IF EXISTS "Teams delete" ON teams;
 CREATE POLICY "Teams delete" ON teams FOR DELETE TO authenticated USING (true);
 
 -- team_members
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Team members view" ON team_members;
 CREATE POLICY "Team members view" ON team_members FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Team members insert" ON team_members;
 CREATE POLICY "Team members insert" ON team_members FOR INSERT TO authenticated WITH CHECK (true);
-DROP POLICY IF EXISTS "Team members delete" ON team_members;
 CREATE POLICY "Team members delete" ON team_members FOR DELETE TO authenticated USING (true);
 
 -- tasks
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Tasks view" ON tasks;
 CREATE POLICY "Tasks view" ON tasks FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Tasks insert" ON tasks;
 CREATE POLICY "Tasks insert" ON tasks FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
-DROP POLICY IF EXISTS "Tasks update" ON tasks;
 CREATE POLICY "Tasks update" ON tasks FOR UPDATE TO authenticated USING (true);
-DROP POLICY IF EXISTS "Tasks delete" ON tasks;
 CREATE POLICY "Tasks delete" ON tasks FOR DELETE TO authenticated USING (true);
 
 -- comments
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Comments view" ON comments;
 CREATE POLICY "Comments view" ON comments FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Comments insert" ON comments;
 CREATE POLICY "Comments insert" ON comments FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-DROP POLICY IF EXISTS "Comments delete" ON comments;
 CREATE POLICY "Comments delete" ON comments FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 -- task_history
 ALTER TABLE task_history ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Task history view" ON task_history;
 CREATE POLICY "Task history view" ON task_history FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Task history insert" ON task_history;
 CREATE POLICY "Task history insert" ON task_history FOR INSERT TO authenticated WITH CHECK (true);
 
 -- presence
 ALTER TABLE presence ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Presence view" ON presence;
 CREATE POLICY "Presence view" ON presence FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Presence insert" ON presence;
 CREATE POLICY "Presence insert" ON presence FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-DROP POLICY IF EXISTS "Presence update" ON presence;
 CREATE POLICY "Presence update" ON presence FOR UPDATE TO authenticated USING (auth.uid() = user_id);
 
 -- ============================================
@@ -167,7 +158,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
@@ -179,11 +169,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
@@ -191,9 +179,9 @@ CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
 -- REALTIME
 -- ============================================
 
-DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE tasks; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE comments; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE presence; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE teams; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE team_members; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE task_history; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER PUBLICATION supabase_realtime ADD TABLE tasks;
+ALTER PUBLICATION supabase_realtime ADD TABLE comments;
+ALTER PUBLICATION supabase_realtime ADD TABLE presence;
+ALTER PUBLICATION supabase_realtime ADD TABLE teams;
+ALTER PUBLICATION supabase_realtime ADD TABLE team_members;
+ALTER PUBLICATION supabase_realtime ADD TABLE task_history;
