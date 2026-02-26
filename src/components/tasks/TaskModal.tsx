@@ -35,9 +35,10 @@ interface TaskModalProps {
   onSave: (task: Partial<Task>) => void;
   onDelete?: () => void;
   users?: Array<{ id: string; email: string; full_name?: string }>;
+  t: (key: string) => string;
 }
 
-export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }: TaskModalProps) {
+export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users, t }: TaskModalProps) {
   const { user } = useAuth();
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -71,35 +72,35 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{task ? "Edit Task" : "Create Task"}</DialogTitle>
+          <DialogTitle>{task ? t("editTask") : t("createTask")}</DialogTitle>
           <DialogDescription className="sr-only">
-            {task ? "Edit task details and comments" : "Create a new task"}
+            {task ? t("editTaskDesc") : t("createTaskDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Title</label>
+            <label className="text-sm font-medium">{t("title")}</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Task title"
+              placeholder={t("taskTitle")}
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
+            <label className="text-sm font-medium">{t("description")}</label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Task description"
+              placeholder={t("taskDescription")}
               rows={3}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Priority</label>
+              <label className="text-sm font-medium">{t("priority")}</label>
               <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -107,7 +108,7 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
                 <SelectContent>
                   {Object.entries(priorityConfig).map(([key, config]) => (
                     <SelectItem key={key} value={key}>
-                      <span className={config.color}>{config.label}</span>
+                      <span className={config.color}>{t(config.labelKey || key)}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -115,7 +116,7 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
+              <label className="text-sm font-medium">{t("status")}</label>
               <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -123,7 +124,7 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
                 <SelectContent>
                   {Object.entries(statusConfig).map(([key, config]) => (
                     <SelectItem key={key} value={key}>
-                      <span className={config.color}>{config.label}</span>
+                      <span className={config.color}>{t(config.labelKey || key)}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -133,7 +134,7 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Deadline</label>
+              <label className="text-sm font-medium">{t("deadline")}</label>
               <Input
                 type="datetime-local"
                 value={deadline}
@@ -142,13 +143,13 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Assignee</label>
+              <label className="text-sm font-medium">{t("assignee")}</label>
               <Select value={assignee || "unassigned"} onValueChange={(v) => setAssignee(v === "unassigned" ? "" : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select assignee" />
+                  <SelectValue placeholder={t("selectAssignee")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  <SelectItem value="unassigned">{t("unassigned")}</SelectItem>
                   {users?.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.full_name || u.email}
@@ -162,8 +163,8 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
           {/* Comments Section */}
           {task && (
             <div className="space-y-3 pt-4 border-t">
-              <h4 className="font-medium">Comments</h4>
-              
+              <h4 className="font-medium">{t("comments")}</h4>
+
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 <AnimatePresence>
                   {comments.map((comment) => (
@@ -182,7 +183,7 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
                             </AvatarFallback>
                           </Avatar>
                           <span className="text-xs font-medium">
-                            {comment.user?.full_name || comment.user?.email || 'Unknown'}
+                            {comment.user?.full_name || comment.user?.email || t("unknown")}
                           </span>
                         </div>
                         {comment.user_id === user?.id && (
@@ -209,7 +210,7 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
                 <Input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Add a comment..."
+                  placeholder={t("addComment")}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
                 />
                 <Button size="icon" onClick={handleAddComment}>
@@ -227,10 +228,10 @@ export function TaskModal({ task, open, onOpenChange, onSave, onDelete, users }:
             </Button>
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button onClick={handleSave}>
-            {task ? "Save Changes" : "Create Task"}
+            {task ? t("saveChanges") : t("create")}
           </Button>
         </DialogFooter>
       </DialogContent>

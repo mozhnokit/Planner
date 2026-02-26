@@ -6,18 +6,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const priorityConfig: Record<Priority, { label: string; color: string; bgColor: string }> = {
-  low: { label: 'Low', color: 'text-priority-low', bgColor: 'bg-priority-low/20' },
-  medium: { label: 'Medium', color: 'text-priority-medium', bgColor: 'bg-priority-medium/20' },
-  high: { label: 'High', color: 'text-priority-high', bgColor: 'bg-priority-high/20' },
-  urgent: { label: 'Urgent', color: 'text-priority-urgent', bgColor: 'bg-priority-urgent/20' },
+export const priorityConfig: Record<Priority, { label: string; labelKey: string; color: string; bgColor: string }> = {
+  low: { label: 'Low', labelKey: 'low', color: 'text-priority-low', bgColor: 'bg-priority-low/20' },
+  medium: { label: 'Medium', labelKey: 'medium', color: 'text-priority-medium', bgColor: 'bg-priority-medium/20' },
+  high: { label: 'High', labelKey: 'high', color: 'text-priority-high', bgColor: 'bg-priority-high/20' },
+  urgent: { label: 'Urgent', labelKey: 'urgent_priority', color: 'text-priority-urgent', bgColor: 'bg-priority-urgent/20' },
 };
 
-export const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
-  todo: { label: 'To Do', color: 'text-slate-400' },
-  'in-progress': { label: 'In Progress', color: 'text-blue-400' },
-  review: { label: 'Review', color: 'text-yellow-400' },
-  done: { label: 'Done', color: 'text-green-400' },
+export const statusConfig: Record<TaskStatus, { label: string; labelKey: string; color: string }> = {
+  todo: { label: 'To Do', labelKey: 'todo', color: 'text-slate-400' },
+  'in-progress': { label: 'In Progress', labelKey: 'inProgress', color: 'text-blue-400' },
+  review: { label: 'Review', labelKey: 'review', color: 'text-yellow-400' },
+  done: { label: 'Done', labelKey: 'done', color: 'text-green-400' },
 };
 
 export function getInitials(name?: string, email?: string): string {

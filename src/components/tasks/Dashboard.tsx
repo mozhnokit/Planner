@@ -4,10 +4,12 @@ import { useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTasks } from "@/hooks/useTasks";
 import { usePresence } from "@/hooks/usePresence";
+import { useLocale } from "@/context/LocaleContext";
 import { TaskModal } from "./TaskModal";
 import { TaskCard } from "./TaskCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import {
   Select,
   SelectContent,
@@ -33,6 +35,7 @@ import {
 export function Dashboard() {
   const { user, signOut, updatePresence } = useAuth();
   const { onlineUsers } = usePresence();
+  const { t } = useLocale();
   const [filter, setFilter] = useState<'all' | 'my-tasks' | 'urgent'>('all');
   const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -139,11 +142,14 @@ export function Dashboard() {
               <div className="flex items-center gap-3">
                 <Zap className="h-8 w-8 text-primary" />
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-                  Team Flow
+                  {t("teamFlow")}
                 </h1>
               </div>
 
               <div className="flex items-center gap-4">
+                {/* Language Switcher */}
+                <LanguageSwitcher />
+
                 {/* Online Users */}
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
@@ -157,7 +163,7 @@ export function Dashboard() {
                     ))}
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {onlineUsers.length} online
+                    {onlineUsers.length} {t("online")}
                   </span>
                 </div>
 
@@ -170,7 +176,7 @@ export function Dashboard() {
                   </Avatar>
                   <Button variant="ghost" size="sm" onClick={() => { signOut(); updatePresence(); }}>
                     <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
+                    {t("signOut")}
                   </Button>
                 </div>
               </div>
@@ -190,7 +196,7 @@ export function Dashboard() {
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search tasks..."
+                  placeholder={t("searchTasks")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 glass"
@@ -203,15 +209,15 @@ export function Dashboard() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Tasks</SelectItem>
-                  <SelectItem value="my-tasks">My Tasks</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="all">{t("allTasks")}</SelectItem>
+                  <SelectItem value="my-tasks">{t("myTasks")}</SelectItem>
+                  <SelectItem value="urgent">{t("urgent")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Button onClick={handleCreateTask} className="bg-gradient-to-r from-primary to-purple-500">
                 <Plus className="h-4 w-4 mr-2" />
-                New Task
+                {t("newTask")}
               </Button>
             </div>
 
@@ -269,9 +275,9 @@ export function Dashboard() {
 
           {!loading && filteredTasks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <p>No tasks found</p>
+              <p>{t("noTasksFound")}</p>
               <Button variant="link" onClick={handleCreateTask}>
-                Create your first task
+                {t("createFirstTask")}
               </Button>
             </div>
           )}
@@ -285,6 +291,7 @@ export function Dashboard() {
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
           users={users}
+          t={t}
         />
       </div>
     </DndContext>

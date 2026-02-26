@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useLocale } from "@/context/LocaleContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/auth/Card";
@@ -17,6 +18,7 @@ export function AuthScreen() {
   const [error, setError] = useState("");
 
   const { signIn, signUp } = useAuth();
+  const { t } = useLocale();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,15 +52,15 @@ export function AuthScreen() {
             <div className="flex items-center gap-2 justify-center mb-2">
               <Zap className="h-8 w-8 text-primary" />
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-                Team Flow
+                {t("teamFlow")}
               </h1>
             </div>
             <CardTitle className="text-center">
-              {isSignUp ? "Create an account" : "Welcome back"}
+              {isSignUp ? t("signUp") : t("signIn")}
             </CardTitle>
             <CardDescription className="text-center">
-              {isSignUp 
-                ? "Enter your details to create your account" 
+              {isSignUp
+                ? "Enter your details to create your account"
                 : "Enter your credentials to access your account"}
             </CardDescription>
           </CardHeader>
@@ -72,11 +74,11 @@ export function AuthScreen() {
                 >
                   <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Full Name
+                    {t("fullName")}
                   </label>
                   <Input
                     type="text"
-                    placeholder="John Doe"
+                    placeholder={t("fullNamePlaceholder")}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
@@ -84,15 +86,15 @@ export function AuthScreen() {
                   />
                 </motion.div>
               )}
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  Email
+                  {t("email")}
                 </label>
                 <Input
                   type="email"
-                  placeholder="name@example.com"
+                  placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -103,7 +105,7 @@ export function AuthScreen() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Lock className="h-4 w-4" />
-                  Password
+                  {t("password")}
                 </label>
                 <Input
                   type="password"
@@ -130,7 +132,7 @@ export function AuthScreen() {
                 className="w-full bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90"
                 disabled={loading}
               >
-                {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
+                {loading ? t("loading") : isSignUp ? t("signUp") : t("signIn")}
               </Button>
 
               <Button
@@ -142,7 +144,7 @@ export function AuthScreen() {
                   setError("");
                 }}
               >
-                {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
+                {isSignUp ? t("hasAccount") : t("noAccount")}
               </Button>
             </form>
           </CardContent>
