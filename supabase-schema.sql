@@ -1,5 +1,6 @@
 -- Team Flow Planner - Supabase Schema
 -- Execute this in Supabase SQL Editor
+-- Version: 2.0 - Fixed RLS policies
 
 -- ============================================
 -- TABLES
@@ -108,7 +109,8 @@ CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE TO aut
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Teams are viewable by members" ON teams;
 CREATE POLICY "Teams are viewable by members" ON teams FOR SELECT TO authenticated USING (
-  id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()) OR owner_id = auth.uid()
+  EXISTS (SELECT 1 FROM team_members WHERE team_members.team_id = teams.id AND team_members.user_id = auth.uid())
+  OR owner_id = auth.uid()
 );
 DROP POLICY IF EXISTS "Authenticated users can create teams" ON teams;
 CREATE POLICY "Authenticated users can create teams" ON teams FOR INSERT TO authenticated WITH CHECK (auth.uid() = owner_id);
@@ -121,34 +123,41 @@ CREATE POLICY "Team owners can delete their teams" ON teams FOR DELETE TO authen
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Team members are viewable by members" ON team_members;
 CREATE POLICY "Team members are viewable by members" ON team_members FOR SELECT TO authenticated USING (
-  team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid())
+  EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = team_members.team_id AND tm.user_id = auth.uid())
 );
 DROP POLICY IF EXISTS "Team owners can manage members" ON team_members;
 CREATE POLICY "Team owners can manage members" ON team_members FOR INSERT TO authenticated WITH CHECK (
-  team_id IN (SELECT id FROM teams WHERE owner_id = auth.uid())
+  EXISTS (SELECT 1 FROM teams WHERE teams.id = team_members.team_id AND teams.owner_id = auth.uid())
 );
 DROP POLICY IF EXISTS "Team owners can remove members" ON team_members;
 CREATE POLICY "Team owners can remove members" ON team_members FOR DELETE TO authenticated USING (
-  team_id IN (SELECT id FROM teams WHERE owner_id = auth.uid())
+  EXISTS (SELECT 1 FROM teams WHERE teams.id = team_members.team_id AND teams.owner_id = auth.uid())
 );
 
--- tasks (с поддержкой личных и командных задач)
+-- tasks (упрощённая RLS политика)
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Tasks are viewable by authorized users" ON tasks;
 CREATE POLICY "Tasks are viewable by authorized users" ON tasks FOR SELECT TO authenticated USING (
-  (is_private = true AND created_by = auth.uid())
-  OR (is_private = false AND team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid()))
-  OR created_by = auth.uid()
+  created_by = auth.uid()
+  OR (is_private = false AND team_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM team_members WHERE team_members.team_id = tasks.team_id AND team_members.user_id = auth.uid()
+  ))
 );
 DROP POLICY IF EXISTS "Authenticated users can create tasks" ON tasks;
 CREATE POLICY "Authenticated users can create tasks" ON tasks FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
 DROP POLICY IF EXISTS "Authorized users can update tasks" ON tasks;
 CREATE POLICY "Authorized users can update tasks" ON tasks FOR UPDATE TO authenticated USING (
-  created_by = auth.uid() OR team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid())
+  created_by = auth.uid()
+  OR (team_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM team_members WHERE team_members.team_id = tasks.team_id AND team_members.user_id = auth.uid()
+  ))
 );
 DROP POLICY IF EXISTS "Authorized users can delete tasks" ON tasks;
 CREATE POLICY "Authorized users can delete tasks" ON tasks FOR DELETE TO authenticated USING (
-  created_by = auth.uid() OR team_id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid())
+  created_by = auth.uid()
+  OR (team_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM team_members WHERE team_members.team_id = tasks.team_id AND team_members.user_id = auth.uid()
+  ))
 );
 
 -- comments
@@ -183,7 +192,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, full_name, avatar_url)
-  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'avatar_url');
+  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'full_name', ''), COALESCE(NEW.raw_user_meta_data->>'avatar_url', ''));
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
