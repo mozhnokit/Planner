@@ -24,14 +24,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updatePresence = useCallback(async () => {
     if (!user) return;
     try {
-      await supabase
+      // Сначала пробуем обновить
+      const { data: existing } = await supabase
         .from('presence')
-        .upsert({
-          user_id: user.id,
-          last_seen: new Date().toISOString(),
-        }, {
-          onConflict: 'user_id'
-        });
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (existing) {
+        // Обновляем существующую запись
+        await supabase
+          .from('presence')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('user_id', user.id);
+      } else {
+        // Вставляем новую
+        await supabase
+          .from('presence')
+          .insert({
+            user_id: user.id,
+            last_seen: new Date().toISOString(),
+          });
+      }
     } catch (error) {
       console.error('Error updating presence:', error);
     }
